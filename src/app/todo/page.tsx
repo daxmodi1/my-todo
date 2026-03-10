@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getCurrentUser, signOut } from "aws-amplify/auth";
 
 interface Task {
   id: string;
@@ -16,19 +17,17 @@ export default function TodoPage() {
   const [user, setUser] = useState("");
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    const storedUser = localStorage.getItem("taskflow_user");
-    if (!storedUser) {
-      router.push("/login");
-      return;
-    }
-    setUser(storedUser);
-
-    // Load persisted tasks
-    const storedTasks = localStorage.getItem("taskflow_tasks");
-    if (storedTasks) {
-      setTasks(JSON.parse(storedTasks));
-    }
+    const checkAuth = async () => {
+      try {
+        const { username } = await getCurrentUser();
+        setUser(username);
+        const storedTasks = localStorage.getItem("taskflow_tasks");
+        if (storedTasks) setTasks(JSON.parse(storedTasks));
+      } catch {
+        router.push("/login");
+      }
+    };
+    checkAuth();
   }, [router]);
 
   const saveTasks = (updated: Task[]) => {
@@ -57,8 +56,8 @@ export default function TodoPage() {
     if (e.key === "Enter") addTask();
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("taskflow_user");
+  const handleLogout = async () => {
+    await signOut();
     router.push("/login");
   };
 

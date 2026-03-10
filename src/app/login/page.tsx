@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signIn } from "aws-amplify/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,24 +16,20 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    // ─────────────────────────────────────────────────────────────
-    // TODO: Replace this block with AWS Cognito once set up:
-    //
-    //   import { signIn } from "aws-amplify/auth";
-    //   await signIn({ username: email, password });
-    //
-    // ─────────────────────────────────────────────────────────────
     try {
-      if (!email || !password) throw new Error("Please fill in all fields.");
-      if (password.length < 6)
-        throw new Error("Password must be at least 6 characters.");
-
-      // Placeholder auth — stores the email as the "session"
-      localStorage.setItem("taskflow_user", email);
-      router.push("/todo");
+      const { isSignedIn } = await signIn({ username: email, password });
+      if (isSignedIn) router.push("/todo");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      const code = (err as { name?: string }).name;
+      if (code === "UserNotConfirmedException") {
+        setError("Please confirm your email first. Check your inbox.");
+      } else if (code === "NotAuthorizedException") {
+        setError("Incorrect email or password.");
+      } else if (code === "UserNotFoundException") {
+        setError("No account found with that email.");
+      } else {
+        setError(err instanceof Error ? err.message : "Login failed.");
+      }
     } finally {
       setLoading(false);
     }
@@ -113,7 +110,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Authentication will be powered by AWS Cognito
+          Secured by AWS Cognito
         </p>
 
         <div className="text-center mt-3">
