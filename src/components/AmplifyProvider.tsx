@@ -2,7 +2,23 @@
 import { Amplify } from "aws-amplify";
 import { useEffect } from "react";
 
-const redirectSignIn = process.env.NEXT_PUBLIC_REDIRECT_SIGN_IN!;
+function parseRedirects(value: string | undefined, fallback: string): string[] {
+  const parsed = (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return parsed.length > 0 ? parsed : [fallback];
+}
+
+const redirectSignIn = parseRedirects(
+  process.env.NEXT_PUBLIC_REDIRECT_SIGN_IN,
+  "http://localhost:3000/auth/callback"
+);
+const redirectSignOut = parseRedirects(
+  process.env.NEXT_PUBLIC_REDIRECT_SIGN_OUT,
+  "http://localhost:3000/"
+);
 
 Amplify.configure({
   Auth: {
@@ -13,8 +29,8 @@ Amplify.configure({
         oauth: {
           domain: process.env.NEXT_PUBLIC_COGNITO_DOMAIN!,
           scopes: ["email", "openid", "profile"],
-          redirectSignIn: [redirectSignIn],
-          redirectSignOut: [process.env.NEXT_PUBLIC_REDIRECT_SIGN_OUT!],
+          redirectSignIn,
+          redirectSignOut,
           responseType: "code",
         },
       },
@@ -29,9 +45,15 @@ export default function AmplifyProvider({
 }) {
   useEffect(() => {
     const currentOrigin = window.location.origin;
-    if (redirectSignIn && !redirectSignIn.startsWith(currentOrigin)) {
+    const hasMatchingRedirect = redirectSignIn.some((url) =>
+      url.startsWith(currentOrigin)
+    );
+
+    if (!hasMatchingRedirect) {
       console.warn(
-        `Amplify Redirect Mismatch: Configured to ${redirectSignIn} but currently on ${currentOrigin}. OAuth might fail or redirect to wrong host.`
+        `Amplify Redirect Mismatch: Configured redirects are ${redirectSignIn.join(
+          ", "
+        )} but currently on ${currentOrigin}. OAuth might fail.`
       );
     }
   }, []);
